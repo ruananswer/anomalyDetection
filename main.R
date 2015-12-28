@@ -2,7 +2,7 @@
 #install.packages("devtools")
 #devtools::install_github("twitter/AnomalyDetection")
 #devtools::install_github("petermeissner/wikipediatrend")
-
+#devtools::install_github("hafen/stlplus")
 #library(AnomalyDetection)
 ##################
 
@@ -38,7 +38,7 @@ detectAnomaly <- function(usual = createDays(10, 0.05), strange = NULL){
   all <- c(usual, strange)
   plot(as.ts(all))
   
-  res = AnomalyDetectionVec(all, max_anoms=0.015, period=pointPerDay, direction='both', only_last=TRUE, plot=TRUE)
+  res = AnomalyDetectionVec(all, max_anoms=0.015, period=pointPerDay, direction='both', plot=TRUE)
   res$plot
 }
 
@@ -57,7 +57,6 @@ smallChangeOnStrictModel <- function(){
   strange[40] = strange[40]-0.001
   detectAnomaly(usual = usual, strange = strange)
 }
-
 # small change
 smallChange <- function(){
   set.seed(4321)
@@ -91,13 +90,6 @@ growSuddenly <- function(){
   set.seed(4321)
   usual <- createDays(10, 0.1)
   strange <- createDay(noise = 0.1)*1.6
-  detectAnomaly(usual = usual, strange = strange)
-}
-
-removeNoise <- function(){
-  set.seed(4321)
-  usual <- createDays(10, 0.1)
-  strange <- createDay(noise = 0.0)
   detectAnomaly(usual = usual, strange = strange)
 }
 
@@ -148,7 +140,7 @@ tmp <- function(){
   blabla <- rnorm(n = 2400, mean = 10, sd = 0.1)
   blabla[2200] <- 12
   
-  res = AnomalyDetectionVec(blabla, max_anoms=0.0001, alpha = 0.4, period=400, direction='both', only_last=T, plot=TRUE)
+  res = AnomalyDetectionVec(blabla, max_anoms=0.001, alpha = 0.4, period=400, direction='both', plot=TRUE)
   res$plot
 }
 
@@ -162,7 +154,7 @@ bumpInDoublePick <- function(){
   all <- c(usual, strange)
   plot(as.ts(all))
   
-  res = AnomalyDetectionVec(all, max_anoms=0.49, period=pointPerDay*2, direction='both', only_last=TRUE, plot=TRUE)
+  res = AnomalyDetectionVec(all, max_anoms=0.49, period=pointPerDay*2, direction='both', plot=TRUE)
   res$plot
 }
 
@@ -174,7 +166,7 @@ exponentialGrow <- function(){
   }
   
   plot(as.ts(allDays))
-  res = AnomalyDetectionVec(allDays, max_anoms=0.49, period=pointPerDay, direction='both', only_last=TRUE, plot=TRUE)
+  res = AnomalyDetectionVec(allDays, max_anoms=0.49, period=pointPerDay, direction='both', plot=TRUE)
   res$plot
 }
 
@@ -191,7 +183,7 @@ linearGrow <- function(){
   allDays <- linearGrowData()
   
   plot(as.ts(allDays))
-  res = AnomalyDetectionVec(allDays, max_anoms=0.49, period=pointPerDay, direction='both', only_last=TRUE, plot=TRUE)
+  res = AnomalyDetectionVec(allDays, max_anoms=0.49, period=pointPerDay, direction='both', plot=TRUE)
   res$plot
 }
 
@@ -199,14 +191,14 @@ linearGrowWithError <- function(){
   allDays <- linearGrowData()
   allDays[length(allDays)-(pointPerDay/2)] <- -3
   plot(as.ts(allDays))
-  res = AnomalyDetectionVec(allDays, max_anoms=0.49, period=pointPerDay, direction='both', only_last=TRUE, plot=TRUE)
+  res = AnomalyDetectionVec(allDays, max_anoms=0.49, period=pointPerDay, direction='both', plot=TRUE)
   res$plot
 }
 
 justGrow <- function(){
   grow <- seq(1:(pointPerDay*14))*2+10
   plot(as.ts(grow))
-  res = AnomalyDetectionVec(grow, max_anoms=0.49, period=pointPerDay, direction='both', only_last=TRUE, plot=TRUE)
+  res = AnomalyDetectionVec(grow, max_anoms=0.49, period=pointPerDay, direction='both', plot=TRUE)
   res$plot
 }
 
@@ -217,7 +209,7 @@ justGrowWithError <- function(){
   grow[end:(end+50)] <- 20
   
   plot(as.ts(grow))
-  res = AnomalyDetectionVec(grow, max_anoms=0.49, period=pointPerDay, direction='both', only_last=TRUE, plot=TRUE)
+  res = AnomalyDetectionVec(grow, max_anoms=0.49, period=pointPerDay, direction='both', plot=TRUE)
   res$plot
 }
 
@@ -393,53 +385,32 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
   } else {
     data <- na.omit(data)
   }
-
-  ###### use stl function
-  # first use num_obs_per_period * 3 to generate trend and seasonal part for the next data generate
-  #num_part_decomp <- 3 * num_obs_per_period
-  #data_part_decomp <- stl(ts(data[[2L]][1:num_part_decomp], frequency = num_obs_per_period),
-  #                   s.window = "periodic", robust = TRUE)
-
-  #for(index in num_part_decomp + 1 : num_obs) {
-      # let the past three period data as the anomaly detection data
-
-  #}
   
+  ###### use stl function
   ### use interpolation to solve this problem
-  time1 <- Sys.time();
-  step = 1
-  aa <- approx(1:num_obs, data$count, xout = seq(1, num_obs, by = step))
+  #time1 <- Sys.time();
+  step = 60
+  tmp_data <- approx(1:num_obs, data$count, xout = seq(1, num_obs, by = step))
   num_obs_per_period = round(num_obs_per_period / step)
-  aa$x <- 1:length(aa$y)
   
   # -- Step 1: Decompose data. This returns a univarite remainder which will be used for anomaly detection. Optionally, we might NOT decompose.
-  data_decomp <- stl(ts(aa[[2L]], frequency = num_obs_per_period),
-                     s.window = "periodic", robust = TRUE)
-  temp_trend = approx(1:length(aa$y), data_decomp$time.series[,"trend"], xout = seq(1, length(aa$y), by = 1.0/step))
-  temp_seasonal = approx(1:length(aa$y), data_decomp$time.series[,"seasonal"], xout = seq(1, length(aa$y), by = 1.0/step))
-  #temp_remainder = approx(1:length(aa$y), data_decomp$time.series[,"remainder"], xout = seq(1, length(aa$y), by = 1.0/step))
-  data_decomp_trend = temp_trend$y[1:length(temp_trend$y)]
-  data_decomp_seasonal = temp_seasonal$y[1:length(temp_trend$y)]
-  #data_decomp_remainder = temp_remainder$y[1:length(temp_trend$y)]
+#   data_decomp <- stl(ts(tmp_data[[2L]], frequency = num_obs_per_period),
+#                      s.window = "periodic", robust = TRUE)        
+#   
+#   temp_trend = approx(data_decomp$time.series[,"trend"], method = "linear", n = num_obs)
+#   temp_seasonal = approx(data_decomp$time.series[,"seasonal"], method = "linear", n = num_obs)
+  # use stl2
+  data_decomp <- stl2(ts(tmp_data[[2L]], frequency = num_obs_per_period),
+                     s.window = "periodic", robust = TRUE)        
   
-  if(length(temp_trend$y) < num_obs) {
-    for (addi in (length(temp_trend$y) + 1) : num_obs) {
-      data_decomp_trend[addi] = data_decomp_trend[addi - 1]
-      data_decomp_seasonal[addi] = data_decomp_seasonal[addi - 1]
-      #data_decomp_remainder[addi] = data_decomp_remainder[addi - 1]
-    }    
-  }
-
-  
-  time2 <- Sys.time();
-  calTime <- time2 - time1
-  print(calTime[1])
+  temp_trend = approx(trend.stl2(data_decomp), method = "linear", n = num_obs)
+  temp_seasonal = approx(seasonal.stl2(data_decomp), method = "linear", n = num_obs)
   
   ####################################
   # Remove the seasonal component, and the median of the data to create the univariate remainder
-  data <- data.frame(timestamp = data[[1L]], count = (data[[2L]]-data_decomp_seasonal-median(data[[2L]])))
+  data <- data.frame(timestamp = data[[1L]], count = (data[[2L]] - temp_seasonal$y - temp_trend$y - median(data[[2L]])))
   # Store the smoothed seasonal component, plus the trend component for use in determining the "expected values" option
-  data_decomp <- data.frame(timestamp=data[[1L]], count=(as.numeric(trunc(data_decomp_trend + data_decomp_seasonal))))
+  data_decomp <- data.frame(timestamp=data[[1L]], count=(as.numeric(trunc(temp_trend$y + temp_seasonal$y))))
   
   if(posix_timestamp){
     data_decomp <- format_timestamp(data_decomp)
@@ -451,9 +422,6 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
     stop(paste0("With longterm=TRUE, AnomalyDetection splits the data into 2 week periods by default. You have ", num_obs, " observations in a period, which is too few. Set a higher piecewise_median_period_weeks."))
   }
   
-  func_ma <- match.fun(median)
-  func_sigma <- match.fun(mad)
-  
   ## Define values and vectors.
   n <- length(data[[2L]])
   if (posix_timestamp){
@@ -461,30 +429,35 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
   } else {
     R_idx <- 1L:max_outliers
   }
+  R_score <- vector(length = max_outliers)
   
   num_anoms <- 0L
+  func_ma <- match.fun(median)
+  func_sigma <- match.fun(mad)
   
-  time1 <- Sys.time();
-  ###### use generalized esd function 
-  # gesd
-  # protect against constant time series
   dataMean <- mean(data[[2L]])
+  dataMedian <- func_ma(data[[2L]])
   dataStd <- sd(data[[2L]]) 
+  
+  # time1 <- Sys.time();
+  ###### use generalized esd function 
+  # protect against constant time series
   if(dataStd == 0) 
     break
   
   if(one_tail){
     if(upper_tail){
-      ares <- data[[2L]] - dataMean
+      ares <- data[[2L]] - dataMedian
     } else {
-      ares <- dataMean - data[[2L]]
+      ares <- dataMedian - data[[2L]]
     }
   } else {
-    ares = abs(data[[2L]] - dataMean)
+    ares = abs(data[[2L]] - dataMedian)
   }
   ares <- ares/dataStd
   aresOrder <- order(-data[[2L]])
   
+  medianIndex <- n/2
   left <- 1
   right <- n
   nowLength <- n
@@ -502,47 +475,45 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
     if (nowLength < 1) break
     # remove largest
     # remove the max diff   left or right
-    if (abs(data[[2L]][aresOrder[left]] - dataMean) > abs(data[[2L]][aresOrder[right]] - dataMean)) {
+    if (abs(data[[2L]][aresOrder[left]] - dataMedian) > abs(data[[2L]][aresOrder[right]] - dataMedian)) {
       temp_max_idx <- aresOrder[left]
       left <- left + 1
+      medianIndex <- medianIndex + 1
     }
     else {
       temp_max_idx <- aresOrder[right]
       right <- right - 1
+      medianIndex <- medianIndex - 1
     }
     # get the R
-    R <- abs((data[[2L]][temp_max_idx] - dataMean) / dataStd)
+    R <- abs((data[[2L]][temp_max_idx] - dataMedian) / dataStd)
     
     # recalculate the dataMean and dataStd
-    #newDataStd <- sqrt(dataStd * dataStd * nowLength/(nowLength - 1) + ((dataMean - data[[2L]][temp_max_idx])/(nowLength - 1))**2 )
     # use math sd
     #dataStd <- sqrt((nowLength * (dataStd**2 + dataMean**2) - data[[2L]][temp_max_idx]**2 - (nowLength * dataMean - data[[2L]][temp_max_idx])**2/(nowLength - 1)) / (nowLength - 1))
     # use statics sd
     dataStd <- sqrt(((nowLength - 1) * (dataStd**2 + dataMean**2) - data[[2L]][temp_max_idx]**2 - ((nowLength - 1) * dataMean - data[[2L]][temp_max_idx])**2/(nowLength - 2)) / (nowLength - 2))
-    #dd <- (dataMean * nowLength - data[[2L]][temp_max_idx]) / (nowLength - 1) - dataMean
-    #newDataStd <- sqrt( (nowLength - 1)*dataStd*dataStd/(nowLength - 2) -(data[[2L]][temp_max_idx] - dataMean)**2/(nowLength - 2) - 2*dd*dataMean + 2*dd/(nowLength - 2)*data[[2L]][temp_max_idx] + dd**2 )
     dataMean <- (dataMean * nowLength - data[[2L]][temp_max_idx]) / (nowLength - 1)
+    dataMedian <- data[[2L]][aresOrder[medianIndex]]
     nowLength <- nowLength - 1
     #record the inx
     R_idx[i] <- data[[1L]][temp_max_idx]
-    if (R < lambda_critical) {
+    R_score[i] <- R
+    if (R < lambda_critical || is.nan(dataStd)) {
       break
     }
+    #points(temp_max_idx, data[[2L]][temp_max_idx], col = "red")
+    
     num_anoms <- i
   }
-  ###### end generalized esd function
-  time2 <- Sys.time();
-  calTime <- time2 - time1
-  print(calTime[1])
-  
-  
   if(num_anoms > 0) {
     R_idx <- R_idx[1L:num_anoms]
   } else {
     R_idx = NULL
   }
+  #print(num_anoms)
   
-  return(list(anoms = R_idx, stl = data_decomp))
+  return(list(anoms = R_idx, anoms_score = R_score, stl = data_decomp))
 }
 
 
@@ -695,15 +666,35 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
     }
   }else{
     # If longterm is not enabled, then just overwrite all_data list with x as the only item
-    all_data <- list(x)
+    x$score <- vector(length = length(x))
+    #all_data <- list(x)
+    
+    ##########
+    # split the data into multi frame
+    ##########
+    num_period_in_part = 3  # three period
+    num_obs_in_period <- period
+    num_obs_in_an_input <- 3 * period
+    step = 10
+
+    all_data <- vector(mode = "list", length = (ceiling((length(x[[1L]]) - 2 * num_obs_in_an_input) / step)))
+    for (j in seq(1, length(x[[1L]]), by = step)) {
+      start_date <- x[[1]][j]
+      end_date <- min(start_date + lubridate::dminutes(num_obs_in_period * num_period_in_part), x[[1]][length(x[[1]])])
+      all_data[[ceiling(j/(step))]] <- subset(x, x[[1]] >= start_date & x[[1]] < end_date)
+      if (end_date == x[[1]][length(x[[1L]])])
+        break;
+    }
+    # end split
+    ##################################
   }
   
   # Create empty data frames to store all anoms and seasonal+trend component from decomposition
-  all_anoms <- data.frame(timestamp=numeric(0), count=numeric(0))
+  all_anoms <- data.frame(timestamp=numeric(0), count=numeric(0), score = numeric(0))
   seasonal_plus_trend <- data.frame(timestamp=numeric(0), count=numeric(0))
   
   # Detect anomalies on all data (either entire data in one-pass, or in 2 week blocks if longterm=TRUE)
-  for(i in 1:length(all_data)) {
+  for(i in 1:(length(all_data))) {
     
     anomaly_direction = switch(direction,
                                "pos" = data.frame(one_tail=TRUE, upper_tail=TRUE), # upper-tail only (positive going anomalies)
@@ -712,18 +703,26 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
     
     # detect_anoms actually performs the anomaly detection and returns the results in a list containing the anomalies
     # as well as the decomposed components of the time series for further analysis.
+    time1 <- Sys.time();
     s_h_esd_timestamps <- detect_anoms(all_data[[i]], k=max_anoms, alpha=alpha, num_obs_per_period=period, use_decomp=TRUE, use_esd=FALSE,
                                        one_tail=anomaly_direction$one_tail, upper_tail=anomaly_direction$upper_tail, verbose=verbose)
+    time2 <- Sys.time();
+    calTime <- time2 - time1
+    print(calTime[1])
     
     # store decomposed components in local variable and overwrite s_h_esd_timestamps to contain only the anom timestamps
+    anoms_score <- s_h_esd_timestamps$anoms_score
     data_decomp <- s_h_esd_timestamps$stl
     s_h_esd_timestamps <- s_h_esd_timestamps$anoms
     
     # -- Step 3: Use detected anomaly timestamps to extract the actual anomalies (timestamp and value) from the data
     if(!is.null(s_h_esd_timestamps)){
       anoms <- subset(all_data[[i]], (all_data[[i]][[1]] %in% s_h_esd_timestamps))
+      for (anoms_index in 1L : length(s_h_esd_timestamps)) {
+        anoms$score[which(anoms$timestamp == s_h_esd_timestamps[anoms_index])] <- anoms_score[anoms_index]
+      }
     } else {
-      anoms <- data.frame(timestamp=numeric(0), count=numeric(0))
+      anoms <- data.frame(timestamp=numeric(0), count=numeric(0), score = numeric(0))
     }
     
     # Filter the anomalies using one of the thresholding functions if applicable
@@ -749,6 +748,15 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
   # Cleanup potential duplicates
   all_anoms <- all_anoms[!duplicated(all_anoms[[1]]), ]
   seasonal_plus_trend <- seasonal_plus_trend[!duplicated(seasonal_plus_trend[[1]]), ]
+  
+  # use an threshold to filter some low score anomalies
+#   if (length(all_anoms) > 0) {
+#     pp <- 1L - alpha/(num_obs_in_an_input)
+#     tt <- qt(pp, (num_obs_in_an_input - 2L))
+#     lambda_critical <- tt*(num_obs_in_an_input - 1) / sqrt((num_obs_in_an_input - 2 + tt**2)*num_obs_in_an_input)
+#     all_anoms <- subset(all_anoms, all_anoms[[3]] >= lambda_critical * 1.05)    
+#   }
+
   
   # -- If only_last was set by the user, create subset of the data that represent the most recent day
   if(!is.null(only_last)){
@@ -815,7 +823,13 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
     
     # Add anoms to the plot as circles.
     # We add zzz_ to the start of the name to ensure that the anoms are listed after the data sets.
-    xgraph <- xgraph + ggplot2::geom_point(data=all_anoms, ggplot2::aes_string(color=paste("\"zzz_",title,"\"",sep="")), size = 3, shape = 1)
+    all_anoms$color <- vector(length = length(all_anoms[[1L]]))
+    max_score = max(all_anoms$score)
+    min_score = min(all_anoms$score)
+    for (index in 1L: length(all_anoms[[1L]])) {
+        all_anoms$color[index] = min(round((all_anoms$score[index] - min_score) / (max_score - min_score) * 255) + 1, 255) * 3
+    }
+    xgraph <- xgraph + ggplot2::geom_point(data=all_anoms, ggplot2::aes_string(color=paste("\"zzz_",title,"\"",sep="")), size = 3,  colour = all_anoms$color)
     
     # Hide legend
     xgraph <- xgraph + ggplot2::theme(legend.position="none")
@@ -934,11 +948,28 @@ AnomalyDetectionVec = function(x, max_anoms=0.10, direction='pos',
     }
   }else{
     # If longterm is not enabled, then just overwrite all_data list with x as the only item
-    all_data <- list(x)
+    x$score <- vector(length = length(x))
+    #all_data <- list(x)
+    ##########
+    # split the data into multi frame
+    ##########
+    num_period_in_part = 3  # three period
+    num_obs_in_period <- period
+    num_obs_in_an_input <- 3 * period
+    step = 1
+    #all_data <- vector(mode="list", length = (ceiling(length(x[[1]])/num_obs_in_period) - num_period_in_part + 1))
+    all_data <- vector(mode = "list", length = (ceiling((length(x[[1L]]) - 2 * num_obs_in_an_input) / step)))
+    for (j in seq(1, length(x[[1L]]), by = step)) {
+      start_date <- x[[1]][j]
+      end_date <- min(start_date + (num_obs_in_period * num_period_in_part), x[[1]][length(x[[1]])])
+      all_data[[ceiling(j/(step))]] <- subset(x, x[[1]] >= start_date & x[[1]] < end_date)
+      if (end_date == x[[1]][length(x[[1L]])])
+        break;
+    }
   }
   
   # Create empty data frames to store all anoms and seasonal+trend component from decomposition
-  all_anoms <- data.frame(timestamp=numeric(0), count=numeric(0))
+  all_anoms <- data.frame(timestamp=numeric(0), count=numeric(0), score = numeric(0))
   seasonal_plus_trend <- data.frame(timestamp=numeric(0), count=numeric(0))
   
   # Detect anomalies on all data (either entire data in one-pass, or in 2 week blocks if longterm=TRUE)
@@ -955,12 +986,16 @@ AnomalyDetectionVec = function(x, max_anoms=0.10, direction='pos',
                                        one_tail=anomaly_direction$one_tail, upper_tail=anomaly_direction$upper_tail, verbose=verbose) 
     
     # store decomposed components in local variable and overwrite s_h_esd_timestamps to contain only the anom timestamps
+    anoms_score <- s_h_esd_timestamps$anoms_score
     data_decomp <- s_h_esd_timestamps$stl
     s_h_esd_timestamps <- s_h_esd_timestamps$anoms
     
     # -- Step 3: Use detected anomaly timestamps to extract the actual anomalies (timestamp and value) from the data
     if(!is.null(s_h_esd_timestamps)){      
       anoms <- subset(all_data[[i]], (all_data[[i]][[1]] %in% s_h_esd_timestamps))
+      for (anoms_index in 1L : length(s_h_esd_timestamps)) {
+        anoms$score[which(anoms$timestamp == s_h_esd_timestamps[anoms_index])] <- anoms_score[anoms_index]
+      }
     } else {
       anoms <- data.frame(timestamp=numeric(0), count=numeric(0))
     }
@@ -992,6 +1027,14 @@ AnomalyDetectionVec = function(x, max_anoms=0.10, direction='pos',
   # Cleanup potential duplicates
   all_anoms <- all_anoms[!duplicated(all_anoms[[1]]), ]
   seasonal_plus_trend <- seasonal_plus_trend[!duplicated(seasonal_plus_trend[[1]]), ]
+  
+  # use an threshold to filter some low score anomalies
+  if (length(all_anoms) > 0) {
+    pp <- 1L - alpha/(num_obs_in_an_input)
+    tt <- qt(pp, (num_obs_in_an_input - 2L))
+    lambda_critical <- tt*(num_obs_in_an_input - 1) / sqrt((num_obs_in_an_input - 2 + tt**2)*num_obs_in_an_input)
+    all_anoms <- subset(all_anoms, all_anoms[[3]] >= lambda_critical * 1.05)
+  }
   
   # -- If only_last was set by the user, create subset of the data that represent the most recent period
   if(only_last){
@@ -1059,7 +1102,13 @@ AnomalyDetectionVec = function(x, max_anoms=0.10, direction='pos',
     
     # Add anoms to the plot as circles.
     # We add zzz_ to the start of the name to ensure that the anoms are listed after the data sets.
-    xgraph <- xgraph + ggplot2::geom_point(data=all_anoms, ggplot2::aes_string(color=paste("\"zzz_",title,"\"",sep="")), size = 3, shape = 1) 
+    all_anoms$color <- vector(length = length(all_anoms[[1L]]))
+    max_score = max(all_anoms$score)
+    min_score = min(all_anoms$score)
+    for (index in 1L: length(all_anoms[[1L]])) {
+      all_anoms$color[index] = min(round((all_anoms$score[index] - min_score) / (max_score - min_score) * 255) + 1, 255)
+    }
+    xgraph <- xgraph + ggplot2::geom_point(data=all_anoms, ggplot2::aes_string(color=paste("\"zzz_",title,"\"",sep="")), size = 3, shape = 1,  colour = all_anoms$color)
     
     # Hide legend and timestamps
     xgraph <- xgraph + ggplot2::theme(axis.text.x=ggplot2::element_blank()) + ggplot2::theme(legend.position="none") 
@@ -1087,38 +1136,39 @@ AnomalyDetectionVec = function(x, max_anoms=0.10, direction='pos',
 
 
 # load data
-#load("data/raw_data.rda");
+load("data/raw_data.rda");
 
-pointPerDay <- length(createDay())
-
-#sucess
-#bumpToEarly()
-#smallChangeOnStrictModel()
-#smallChange()
-#moreNoise()
-#plateau()
-#growSuddenly()
-floor()
+#pointPerDay <- length(createDay())
+# 
+# #sucess
+#bumpToEarly()    
+#smallChangeOnStrictModel() 
+#smallChange()  
+#moreNoise() 
+#plateau()  
+#growSuddenly() 
+#floor()
 #speark()
 #bumpInDoublePick()
 #justGrow()
 #linearGrow()
-
-
-#fail
+#stopSuddenly()
+#tmp()
+# 
+# 
+# #fail
 #removeNoise()
 #flat()
-exponentialGrow()
+#exponentialGrow()
 #linearGrowWithError()
 #justGrowWithError()
 
 #############
 # start time
-#time1 <- Sys.time();
-#res0 <- AnomalyDetectionVec(raw_data, max_anoms=0.02, direction='both', plot=TRUE)
+time1 <- Sys.time();
+res0 <- AnomalyDetectionTs(raw_data, max_anoms=0.02, direction='both', plot=TRUE)
 # end time
-#time2 <- Sys.time();
-#calTime <- time2 - time1;
-#calTime[1]
-#print(calTime[1])
-#res$plot
+time2 <- Sys.time();
+calTime <- time2 - time1;
+print(calTime[1])
+res0$plot
