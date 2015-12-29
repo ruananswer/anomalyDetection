@@ -6,9 +6,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.StringTokenizer;
-import java.util.Arrays;
 import com.github.brandtg.*;
-import org.apache.commons.math3.util.MathUtils;
 import org.apache.commons.math3.distribution.TDistribution;
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
 import org.apache.commons.math3.stat.descriptive.moment.Variance;
@@ -29,12 +27,16 @@ public class AnomalyDetection {
 		ArrayList<Double> rawData = inputData("data.csv");
 		
 		// detect
-		ArrayList<AnomalyPoint> anoms = detectAnoms(rawData, 0.49, 0.05, 24, true);
+		ArrayList<AnomalyPoint> anoms = detectAnoms(rawData, 0.2, 0.05, 24, true);
 		System.out.print("ss");
 		
 	}
 	
-	class AnomalyPoint{
+	public static class AnomalyPoint{
+		public AnomalyPoint(int d, double s) {
+			idx = d;
+			score = s;
+		}
 		private int idx;
 		private double score;
 	};
@@ -72,13 +74,13 @@ public class AnomalyDetection {
 	/* detect anoms 
 	Detects anomalies in a time series
 	Args:
-	    data: Time series to perform anomaly detection on.
-	  	k: Maximum number of anomalies that S-H-ESD will detect as a percentage of the data.
-	  	alpha: The level of statistical significance with which to accept or reject anomalies.
-	  	num_obs_per_period: Defines the number of observations in a single period, and used during seasonal decomposition.
-	  	verbose: Additionally printing for debugging.
-  	Returns:
-  		A list containing the anomalies (anoms) with score
+		data: Time series to perform anomaly detection on.
+		k: Maximum number of anomalies that S-H-ESD will detect as a percentage of the data.
+		alpha: The level of statistical significance with which to accept or reject anomalies.
+		num_obs_per_period: Defines the number of observations in a single period, and used during seasonal decomposition.
+		verbose: Additionally printing for debugging.
+	Returns:
+		A list containing the anomalies (anoms) with score
 	*/
 	public static ArrayList<AnomalyPoint> detectAnoms(ArrayList<Double> rawData, double k, double alpha, int numObsPerPeriod, boolean verbose) {
 		if (numObsPerPeriod <= 0) {
@@ -95,8 +97,8 @@ public class AnomalyDetection {
 		
 		// use stl function
 		// Step 1: Decompose data. This returns a univarite remainder which will be used for anomaly detection. Optionally, we might NOT decompose.
-		double[] timePart = new double[numObs];
-		double[] dataPart = new double[numObs];
+		final double[] timePart = new double[numObs];
+		final double[] dataPart = new double[numObs];
 		for (int i = 0; i < numObs; i++) {
 			timePart[i] = i + 1;
 			dataPart[i] = rawData.get(i);
@@ -105,15 +107,19 @@ public class AnomalyDetection {
 		final StlConfig config = new StlConfig();
 		config.setNumberOfObservations(numObsPerPeriod);
 		config.setNumberOfInnerLoopPasses(10);
-	    config.setNumberOfRobustnessIterations(1);
-	    config.setSeasonalComponentBandwidth(0.75);
-	    config.setLowPassFilterBandwidth(0.30);
-	    config.setTrendComponentBandwidth(0.10);
+		config.setNumberOfRobustnessIterations(1);
+		config.setSeasonalComponentBandwidth(0.75);
+		config.setLowPassFilterBandwidth(0.30);
+		config.setTrendComponentBandwidth(0.10);
 		config.setNumberOfDataPoints(dataPart.length);
 		
 		final StlDecomposition stl = new StlDecomposition(config);
 		final StlResult res = stl.decompose(timePart, dataPart);
 		
+		//if (verbose) {
+		//	StlPlotter.plot(res);
+		//}
+				
 		Mean mean = new Mean(); 
 		Variance variance = new Variance();
 		Median median = new Median();		
@@ -121,10 +127,10 @@ public class AnomalyDetection {
 		// generate data 
 		// Remove the seasonal component, and the median of the data to create the univariate remainder
 		double[] data = new double[numObs];
-	    double[] trend = res.getTrend();
-	    double[] seasonal = res.getSeasonal();
-	    double[] remainder = res.getRemainder();
-	    double rawMedian = median.evaluate(data);
+		double[] trend = res.getTrend();
+		double[] seasonal = res.getSeasonal();
+		//double[] remainder = res.getRemainder();
+		double rawMedian = median.evaluate(dataPart);
 		for (int i = 0; i < numObs; i++) {
 			data[i] = dataPart[i] - trend[i] - seasonal[i] - rawMedian; 
 		}
@@ -135,12 +141,8 @@ public class AnomalyDetection {
 			return null; 
 		}
 		
-		double[] rIdx = new double[maxOutliers];
-		double[] rScore = new double[maxOutliers];
-		int numAnoms = 0;
-		
 		double dataMean = mean.evaluate(data);
-		double dataVariance = variance.evaluate(data);
+		double dataVariance =  Math.sqrt(variance.evaluate(data));
 		double dataMedian = median.evaluate(data);
 		
 		if (Math.abs(dataVariance) < 1e-5) {
@@ -170,14 +172,14 @@ public class AnomalyDetection {
 			@Override
 			public int compare(sortTemp s1, sortTemp s2) {
 				if (s1.getAres() > s2.getAres())
-					return 1;
-				else if (s1.getAres() < s2.getAres())
 					return -1;
+				else if (s1.getAres() < s2.getAres())
+					return 1;
 				else {
 					if (s1.getId() > s2.getId())
-						return 1;
-					else 
 						return -1;
+					else 
+						return 1;
 				}
 			}
 		}
@@ -187,28 +189,64 @@ public class AnomalyDetection {
 		for (int i = 0; i < numObs; i++) {
 			dataAres.add(new sortTemp(i, Math.abs(data[i] - dataMedian) / dataVariance));
 		}
-		//ascending order
+		//descending order
 		Collections.sort(dataAres, new tempComparator());
+		
+		ArrayList<AnomalyPoint> anoms = new ArrayList<AnomalyPoint>();
+		int numAnoms = 0;
 		
 		int medianIndex = numObs / 2;
 		int left = 0;
 		int right = numObs - 1;
 		int currentLength = numObs;
+		int tempMaxIdx = 0;
+		double r = 0.0;
+		
 		for (int outlierIndex = 1; outlierIndex <= maxOutliers; outlierIndex++) {
 			double p = 1.0 - alpha/(2*(numObs - outlierIndex + 1));
-			TDistribution td = new TDistribution(numObs - outlierIndex - 1);
-			double t = td.density(p);
+			TDistribution tDistribution = new TDistribution(numObs - outlierIndex - 1);
+			double t = tDistribution.inverseCumulativeProbability(p);
 			double lambdaCritical = t * (numObs - outlierIndex) / Math.sqrt((numObs - outlierIndex - 1 + t*t) * (numObs - outlierIndex + 1));
 			if (left >= right) break;
 			if (currentLength < 1) break;
 			
 			// remove the largest
-			//if (Math.abs(data[]))
+			if (Math.abs(data[dataAres.get(left).getId()] - dataMedian) > Math.abs(data[dataAres.get(right).getId()] - dataMedian)) {
+				tempMaxIdx = dataAres.get(left).getId();
+				++left;
+				++medianIndex;
+			}
+			else {
+				tempMaxIdx = dataAres.get(right).getId();
+				--right;
+				--medianIndex;
+			}
+			
+			// get the r
+			r = Math.abs((data[tempMaxIdx] - dataMedian) / dataVariance);
+			// recalculate the dataMean and dataStd
+			// use statics sd
+			dataVariance = Math.sqrt( ( (currentLength - 1) * (dataVariance * dataVariance + dataMean * dataMean) - 
+				data[tempMaxIdx] * data[tempMaxIdx] -  ( ( currentLength - 1 )  * dataMean - data[tempMaxIdx]) *  ( ( currentLength - 1 )  * dataMean - data[tempMaxIdx]) /
+				(currentLength - 2)) / (currentLength - 2));
+			dataMean = (dataMean * currentLength - data[tempMaxIdx]) / (currentLength - 1);
+			dataMedian = data[dataAres.get(medianIndex).getId()];
+			--currentLength;			
+
+			// record the index
+			anoms.add(new AnomalyPoint(tempMaxIdx, r));
+			if (r * 1.15 < lambdaCritical  || Math.abs(dataVariance) < 1e-5)
+				break;
+			numAnoms = outlierIndex;
 		}
-		
-		
-		
-		ArrayList<AnomalyPoint> anoms = new ArrayList<AnomalyPoint>();
-		return anoms;
+
+		if (numAnoms > 0) {
+			for (int index = maxOutliers; index >= numAnoms; --index) {
+				anoms.remove(index);
+			}
+			return anoms;
+		}
+		else
+			return null;
 	}
 };
