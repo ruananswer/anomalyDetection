@@ -347,7 +347,7 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, num_period_in_part = 3, samp
     }
   }else{
     # If longterm is not enabled, then just overwrite all_data list with x as the only item
-    x$score <- vector(length = length(x))
+    x$score <- c(length = length(x))
     #all_data <- list(x)
     
     ##########
@@ -660,7 +660,7 @@ AnomalyDetectionVec <- function(x, max_anoms=0.10, num_period_in_part = 3, sampl
     }
   }else{
     # If longterm is not enabled, then just overwrite all_data list with x as the only item
-    x$score <- vector(length = length(x))
+    x$score <- c(length = length(x))
     #all_data <- list(x)
     ##########
     # split the data into multi frame
@@ -826,7 +826,7 @@ AnomalyDetectionVec <- function(x, max_anoms=0.10, num_period_in_part = 3, sampl
     for (index in 1L: length(all_anoms[[1L]])) {
       all_anoms$color[index] = min(round((all_anoms$score[index] - min_score) / (max_score - min_score) * 255) + 1, 255)
     }
-    xgraph <- xgraph + ggplot2::geom_point(data=all_anoms, ggplot2::aes_string(color=paste("\"zzz_",title,"\"",sep="")), size = 3, shape = 1,  colour = all_anoms$color)
+    xgraph <- xgraph + ggplot2::geom_point(data=all_anoms, ggplot2::aes_string(color=paste("\"zzz_",title,"\"",sep="")), size = 3, colour = all_anoms$color)
     
     # Hide legend and timestamps
     xgraph <- xgraph + ggplot2::theme(axis.text.x=ggplot2::element_blank()) + ggplot2::theme(legend.position="none") 
