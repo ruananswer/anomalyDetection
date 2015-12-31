@@ -1,7 +1,3 @@
-source('detect.R')
-source('date_utils.R')
-library(stl2)
-
 createDay <- function(noise=0) {
   point=seq(0, pi, by=0.02)
   connection=sin(point)
@@ -208,25 +204,3 @@ justGrowWithError <- function(){
   res = AnomalyDetectionVec(grow, max_anoms=0.49, num_period_in_part = 3, sample_step = 1, anoms_threshold = 1.15, down_sample_step = 10, period=pointPerDay, direction='both', plot=TRUE)
   res$plot
 }
-
-pointPerDay <- length(createDay())
-# 
-# #sucess
-bumpToEarly()    
-#smallChangeOnStrictModel() 
-#smallChange()  
-#moreNoise() 
-#plateau()  
-#growSuddenly() 
-#floor()
-#speark()
-#bumpInDoublePick()
-#justGrow()
-#linearGrow()
-#stopSuddenly()
-#tmp()
-#removeNoise()
-#flat()
-#exponentialGrow()
-#linearGrowWithError()
-#justGrowWithError()
