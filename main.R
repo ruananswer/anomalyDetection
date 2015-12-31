@@ -22,3 +22,27 @@ time2 <- Sys.time();
 calTime <- time2 - time1;
 print(calTime[1])
 res$plot
+
+
+
+#pointPerDay <- length(createDay())
+# 
+# #sucess
+#bumpToEarly()    
+#smallChangeOnStrictModel() 
+#smallChange()  
+#moreNoise() 
+#plateau()  
+#growSuddenly() 
+#floor()
+#speark()
+#bumpInDoublePick()
+#justGrow()
+#linearGrow()
+#stopSuddenly()
+#tmp()
+#removeNoise()
+#flat()
+#exponentialGrow()
+#linearGrowWithError()
+#justGrowWithError()
