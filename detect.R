@@ -245,7 +245,7 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, num_period_in_part = 3, samp
   if(!direction %in% c('pos', 'neg', 'both')){
     stop("direction options are: pos | neg | both.")
   }
-  if(!(0.01 <= alpha || alpha <= 0.1)){
+  if(!(0.01 <= alpha && alpha <= 0.1)){
     if(verbose) message("Warning: alpha is the statistical signifigance, and is usually between 0.01 and 0.1")
   }
   if(!is.null(only_last) && !only_last %in% c('day','hr')){
@@ -598,7 +598,7 @@ AnomalyDetectionVec <- function(x, max_anoms=0.10, num_period_in_part = 3, sampl
   if(!direction %in% c('pos', 'neg', 'both')){
     stop("direction options are: pos | neg | both.")
   }
-  if(!(0.01 <= alpha || alpha <= 0.1)){
+  if(!(0.01 <= alpha && alpha <= 0.1)){
     if(verbose) message("Warning: alpha is the statistical signifigance, and is usually between 0.01 and 0.1")
   }
   if(is.null(period)){
